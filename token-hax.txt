@@ -1,0 +1,3 @@
+apk add curl jq
+curl -H 'Metadata-Flavor: Google' 'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token?scopes=https://www.googleapis.com/auth/admin.directory.user.readonly,https://www.googleapis.com/auth/admin.directory.group.member.readonly' | jq -j .access_token > token
+curl --variable 'token@token' --expand-oauth2-bearer='{{token}}' https://admin.googleapis.com/admin/directory/v1/groups/f-d-monolith@flow.life/hasMember/jpsugarbroad@flow.life

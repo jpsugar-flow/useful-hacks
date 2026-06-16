@@ -1,0 +1,10 @@
+eval "$(/opt/homebrew/bin/brew shellenv)"
+
+typeset -U PATH path
+path=(~/bin ~/.*/bin "$JAVA_HOME/bin" ${path:#.})
+path=($^path(/N))  # Remove nonexistent directories.
+
+if [[ -n $INTELLIJ_ENVIRONMENT_READER ]]; then
+    # Prevent .zshrc from running
+    unsetopt rcs
+fi

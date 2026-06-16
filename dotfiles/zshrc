@@ -1,0 +1,132 @@
+psvar=$(<~/.zhost) 2>/dev/null
+VIRTUAL_ENV_DISABLE_PROMPT=1
+setopt promptsubst
+_PROMPT_KDEV=""
+_PROMPT_VENV=""
+_PROMPT_TERM=$'\e]133;A\a\e]7;file://%n@%(V.%v.%M)%d\a' # This must be zero-width.
+_PROMPT=$'$_PROMPT_VENV$_PROMPT_KDEV%(V.%v.%m)%(2L.+.-)%# %{\e]133;B\a%}'
+PROMPT="%{$_PROMPT_TERM%}$_PROMPT"
+RPROMPT='%(?.. %?) %~'
+
+typeset -agU precmd_functions preexec_functions
+_terminal_precmd() {
+    if [[ -n $VIRTUAL_ENV_PROMPT ]]; then
+        _PROMPT_VENV="($VIRTUAL_ENV_PROMPT) "
+    else
+        _PROMPT_VENV=""
+    fi
+    print -n "\e]133;D;$?\a"
+}
+_terminal_preexec() {
+    # Work around a weird bug in iTerm.app
+    print -n "\e]133;C;\r\a"
+}
+precmd_functions+=(_terminal_precmd)
+preexec_functions+=(_terminal_preexec)
+
+bindkey -v
+bindkey '^H' backward-delete-char
+bindkey '^U' backward-kill-line
+bindkey '^w' backward-kill-word
+bindkey '^?' backward-delete-char
+if [[ -n $terminfo[kdch1] ]]; then
+    bindkey "$terminfo[kdch1]" delete-char
+fi
+
+HISTSIZE=10000
+setopt nobgnice nobeep automenu autolist noclobber histallowclobber histignoredups histignorespace histnostore correct rmstarsilent
+setopt autopushd pushdignoredups pushdminus pushdsilent
+setopt extendedglob
+disable -p "^" "?"
+
+alias dh='dirs -v'
+
+if [[ `uname` = Darwin ]]; then
+    disable log
+fi
+
+alias cp='cp -i'
+alias mv='mv -i'
+
+rm() {
+    if [[ -n $CLAUDECODE ]]; then
+        /bin/rm "$@"
+    else
+        echo trash or /bin/rm "$@"
+        return 1
+    fi
+}
+
+alias python=python3
+
+md() {
+    mkdir -p "$1"
+    cd "$1"
+}
+
+act() {
+    emulate -L zsh
+    setopt extendedglob
+    local venv=($PWD/(../)#.venv/bin/activate(NY1))
+    if [[ ! -r $venv ]]; then
+        venv=($PWD/(../)#bin/activate(NY1))
+    fi
+    if [[ ! -r $venv ]]; then
+        echo No virtual environment found. >&2
+        return 1
+    fi
+    source $venv
+}
+
+mkvenv() {
+    emulate -L zsh
+    if [[ -a .venv ]]; then
+        echo .venv already exists. >&2
+        return 1
+    fi
+    python3 -m venv --prompt ${PWD:t} .venv
+}
+
+qr() {
+    qrencode -s 8 -o - "$@" | imgcat
+}
+
+alias k=kubectl
+alias kd='kubectl describe'
+kact() {
+    if [[ -n $_kdev_bg ]]; then return; fi
+    export KUBECONFIG=$HOME/.kube/config-gke
+    typeset -g _kdev_bg= _kdev_ts=
+    precmd_functions+=(_kdev_precmd)
+    # iTerm2 uses ST exclusively, even if you use BEL, but xterm uses whatever you used.
+    print -n '\e]11;?\e\\'; read -rsd\\ _kdev_bg
+}
+kdev() {
+    if [[ -n $_kdev_bg ]]; then return; fi
+    kact
+    kubectl config use-context dev-us
+    kubectl config set-context --current --namespace=monolith
+}
+kexit() {
+    if [[ -z $_kdev_bg ]]; then return 1; fi
+    echo -n "$_kdev_bg\\"
+    _PROMPT_KDEV=""
+    unset KUBECONFIG _kdev_bg _kdev_ts
+    precmd_functions=(${precmd_functions:#_kdev_precmd})
+}
+
+zmodload -abi zsh/stat zstat
+_kdev_precmd() {
+    local kc=${KUBECONFIG-$HOME/.kube/config}
+    local ts=$(zstat +mtime $kc):$kc
+    if [[ $ts != $_kdev_ts ]]; then
+        _kdev_ts=$ts
+        local color= ctx=$(kubectl config current-context 2>/dev/null) ns=$(kubectl ns 2>/dev/null)
+        if [[ $ctx = *prod* ]]; then
+            color=$'\e]11;#711\a'
+        elif [[ -n $KUBECONFIG ]]; then
+            color=$'\e]11;#250\a'
+        fi
+        _PROMPT_KDEV="%{$color%}(k:$ctx/$ns) "
+    fi
+}

@@ -1,0 +1,34 @@
+EDIT THIS
+[user]
+	name = YOU
+	email = YOURS
+[advice]
+	skippedCherryPicks = false
+[alias]
+	amend = commit --amend --no-edit
+	b = branch -av
+	dag1 = log --graph --abbrev-commit --decorate --format=format:'%C(blue)%h%C(reset) - %C(cyan)%aD%C(reset) %C(green)(%ar)%C(reset)%C(yellow)%d%C(reset)%n %C(white)%s%C(reset)'
+	dag = dag1 --all
+	please = push --force-with-lease
+	st = status -sb
+	wn = worktree add
+	wls = worktree list
+	wrm = worktree remove
+[core]
+	pager = diff-so-fancy | less --tabs=4 -RF
+[fetch]
+	prune = true
+[init]
+	defaultBranch = main
+[interactive]
+	diffFilter = diff-so-fancy --patch
+[merge]
+	autoStash = true
+[pull]
+	rebase = true
+[push]
+	negotiate = true
+[rebase]
+	autoStash = true
+	autoSquash = true
+	rescheduleFailedExec = true

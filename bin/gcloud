@@ -1,0 +1,36 @@
+#!/bin/bash
+SHELL_CODE="""
+" # this part is shell
+if [[ $1 != "components" || $2 != "post-process" ]]; then
+    export CLOUDSDK_PYTHON_ARGS="-S $(printf %q "$0")"
+fi
+# Use the original script to set up environment correctly.
+exec /opt/homebrew/bin/gcloud "$@"
+"""
+
+import os
+import pathlib
+import subprocess
+import sys
+
+os.environ['CLOUDSDK_PYTHON_ARGS'] = '/opt/homebrew/bin/gcloud'
+sys.path.insert(0, str(pathlib.Path(sys.argv.pop(1)).parent))
+import gcloud
+from googlecloudsdk.core.credentials import google_auth_credentials
+google_auth_credentials.console_io.CanPrompt = lambda: True
+
+sys.modules['__main__'] = gcloud  # for multiprocessing.spawn
+
+attempted = False
+def provide_password(self, unused_metadata):
+    global attempted
+    if attempted:
+        from google.auth import exceptions
+        raise exceptions.ReauthFailError("Password reauth failed.")
+    attempted = True
+    pwd = subprocess.check_output(['op', 'item', 'get', '--vault', 'Employee', 'Google', '--fields', 'password', '--reveal'], text=True)
+    return {'credential': pwd}
+
+from google.oauth2.challenges import PasswordChallenge
+PasswordChallenge.obtain_challenge_input = provide_password
+gcloud.main()

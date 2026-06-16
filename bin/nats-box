@@ -1,0 +1,68 @@
+#!/bin/zsh
+# Usage: nats-box [/path/to/kubeconfig.yaml]
+
+set -euo pipefail
+
+# If kubeconfig provided as argument, use it
+if [[ -n "${1:-}" ]]; then
+    export KUBECONFIG="$1"
+fi
+
+gcloud auth print-identity-token > /dev/null
+POD=$(whoami)-nats-box
+CONTEXT=$(kubectl config current-context)
+NATS_URL=$(kubectl --context="$CONTEXT" -n monolith get cm/monolith-config -o jsonpath='{.data}' | yq '(.["application-k8s.yaml"] | @yamld) * (.["application-k8s-region.yaml"] | @yamld) | .nats.url')
+# Use gmp-critical priority class if it exists (GKE) to minimize preemptions.
+PRIORITY=
+if kubectl --context="$CONTEXT" get pc/gmp-critical &>/dev/null; then
+    PRIORITY="priorityClassName: gmp-critical"
+fi
+
+kubectl --context="$CONTEXT" create -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "$POD"
+  namespace: monolith
+spec:
+  containers:
+  - name: nats-box
+    image: natsio/nats-box
+    env:
+    - name: NATS_URL
+      value: "$NATS_URL"
+    - name: NATS_CREDS
+      value: /nats-creds/nats.creds
+    command:
+    - /bin/sleep
+    - "4200" # 3600 + 600
+    lifecycle:
+      preStop:
+        exec:
+          command:
+          - /bin/sh
+          - -c
+          - "printf '\e[#{\e[7mWarning: container termination requested. 10 minutes to force termination.\e[#}' > /dev/pts/0"
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    volumeMounts:
+    - name: nats-creds
+      mountPath: /nats-creds
+      readOnly: true
+  activeDeadlineSeconds: 3600
+  $PRIORITY
+  restartPolicy: Never
+  terminationGracePeriodSeconds: 600
+  volumes:
+  - name: nats-creds
+    secret:
+      secretName: nats-creds
+EOF
+trap 'kubectl --context="$CONTEXT" -n monolith delete --interactive=false --grace-period=1 "pod/$POD"' EXIT
+kubectl --context="$CONTEXT" -n monolith wait --for=condition=Ready --timeout=5m "pod/$POD"  # Long timeout for node scale up
+kubectl --context="$CONTEXT" -n monolith exec -it "pod/$POD" -- /bin/sh

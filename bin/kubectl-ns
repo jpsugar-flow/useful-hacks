@@ -1,0 +1,23 @@
+#!/usr/bin/env zsh
+
+set -eo pipefail
+
+typeset -a help ctx
+zparseopts -D -E -- \
+    {h,-help}=help \
+    -context:=ctx
+
+if [[ -n $help || $# -gt 1 || $1 = -* ]]; then
+    echo 'Syntax: kubectl ns [NAME]' >&2
+    exit 1
+fi
+
+if (( $#ctx )); then
+    ctx[-1]=${ctx[-1]#=}
+fi
+
+if (( $# )); then
+    kubectl config set-context ${ctx[-1]---current} --namespace=$1
+else
+    kubectl config $ctx view --minify -o json | jq -r '.contexts[0].context.namespace // "default"'
+fi
