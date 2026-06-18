@@ -1,0 +1,56 @@
+set nocompatible
+
+set autoindent
+set background=dark
+set belloff=cursor,esc
+set cinoptions=g0,:0
+set encoding=utf-8
+set expandtab
+set formatoptions+=jl
+set grepprg=rg\ -nH
+set hidden
+set incsearch
+set ignorecase
+set nojoinspaces
+set laststatus=2
+set list
+set listchars=tab:»·,trail:·
+set modeline
+set scrolloff=3
+set shiftwidth=4
+set showmatch
+set shortmess=at
+set smartcase
+set smarttab
+set visualbell
+set whichwrap=b,s,<,>,[,]
+set wildmode=longest,list,full
+set wrap
+
+let g:python_indent = #{open_paren: "shiftwidth()"}
+
+highlight LineNrAbove ctermfg=7 guifg=fg
+highlight LineNrBelow ctermfg=7 guifg=fg
+
+nnoremap <Leader><Leader> :setlocal nolist ts=4 sw=4 noet<CR>
+nnoremap <leader>e :e <C-R>=expand('%:h') . '/'<CR>
+
+noremap Q gq
+
+map K k
+noremap gK K
+map <F1> <Nop>
+
+filetype plugin indent on
+syntax on
+
+augroup ft_custom
+au!
+au BufRead,BufNewFile *.go set nolist ts=4 sw=4 noet
+au BufRead,BufNewFile *.ts set nolist sw=2
+au BufRead,BufNewFile *.vue set nolist ts=4 sw=4 noet ft=html
+augroup END
+
+call clearmatches()
+
+set secure
